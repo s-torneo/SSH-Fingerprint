@@ -51,9 +51,12 @@ void my_packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_c
     printf("Payload size: %d bytes\n\n", payload_length);
     payload = packet + total_headers_size;
 
+    // è il modo corretto di stamparla?
     uint32_t  len = *(payload);
     len = ntohs(len);
-    printf("\nlen payload: %x\n",len);
+    printf("\nlen payload: %d\n",len);
+    
+    
     if (payload_length > 0) {
         const u_char *temp_pointer = payload;
         int byte_count = 0;
