@@ -22,41 +22,44 @@
 
   char *ssh_protocol;
 
-  char* md5(char *algorithms){
+  /* calcola la fingerprint */
+  void md5(char *algorithms, char *fingerprint){
     unsigned char result [MD5_DIGEST_LENGTH];
     MD5((unsigned char*)algorithms, strlen(algorithms), result);
-    char *mdString = malloc(sizeof(char)*33);
     for(int i = 0; i < 16; i++)
-      sprintf(&mdString[i*2], "%02x", (unsigned int)result[i]);
-    return mdString;
+      sprintf(&fingerprint[i*2], "%02x", (unsigned int)result[i]);
   }
 
+  /* prende gli algoritmi di hash dal payload separandoli con ';' */
   void Split(char *str, int *sum){
-    const u_char *temp_pointer = (payload + 26); /* 26 byte = 4 byte packet length + 1 byte padding length + 1 byte msg code + 16 byte ssh cookie 
-    + 4 kex_algorithms_length */
+    const u_char *temp_pointer = (payload + 26); /* 26 byte = 4 byte packet length + 1 byte padding length 
+    + 1 byte msg code + 16 byte ssh cookie + 4 kex_algorithms_length */
     for (int i = 0, counter = 0; i < payload_length; i++, counter++) {
       if ((temp_pointer[i] >= 32 && temp_pointer[i] <= 126) || temp_pointer[i] == 10 || temp_pointer[i] == 11 || temp_pointer[i] == 13)
         str[i]=temp_pointer[i];
       else {
-        str[i]=' ';
+        str[i]=';';
         *(sum) += counter;
         counter = -1;
       }
     }
   }
-
+  
+  /* concatena gli algoritmi di hash interessati */
   void Concat_Algorithms(char *algorithms, char *str, int split_counter){
     int i = 0, flag = 0, counter_alg = 0;
     while(i < split_counter){
-      while(str[i] == ' ')
+      while(str[i] == ';')
         i++;
-      if(str[i-1] == ' '){
+      if(str[i-1] == ';'){
         flag++;
-        /*if(i < split_counter-1)
-          algorithms[counter_alg++] = str[i-1];*/
+        if(i < split_counter-1 && !(flag%2)){
+          algorithms[counter_alg++] = str[i-1];
+        }
       }
-      if(flag % 2 == 0)
+      if(!(flag % 2)){
         algorithms[counter_alg++] = str[i];
+      }
       i++;
     }
   }
@@ -114,24 +117,29 @@
     payload = packet + total_headers_size;
 
     /* uint32_t len = (uint32_t)*(payload + 4);
-    long len1 = ntohl(len); */
+    long len1 = ntohl(len); 
+    printf("\n\n len: %d",len); */
 
-    //printf("\n\n len: %d",len);
     if (payload_length > 7 && payload_length < 100 && memcmp(payload,"SSH-",4) == 0) {
       //PrintInfo(header);
-      ssh_protocol = malloc(sizeof(char)*payload_length);
+      ssh_protocol = calloc(payload_length,sizeof(char));
       GetSSHProtocol(ssh_protocol);
     }
     else if(payload_length > 1000 && payload_length < 1500){
       //PrintInfo(header);
-      char *split = malloc(sizeof(char)*payload_length);
+      char *split = calloc(payload_length,sizeof(char));
       int split_counter = 0;
       Split(split, &split_counter);
-      char *algorithms = malloc(sizeof(char)*split_counter);
+      char *algorithms = calloc(split_counter,sizeof(char));
       Concat_Algorithms(algorithms, split, split_counter);
-      printf("%s",algorithms);
-      printf("\n\n%s - %s\n", md5(algorithms), ssh_protocol);
+      free(split);
+      printf("%s\n\n",algorithms);
+      char *fingerprint = calloc(33,sizeof(char));
+      md5(algorithms, fingerprint);
+      printf("%s - %s\n",fingerprint, ssh_protocol);
+      free(fingerprint);
       free(ssh_protocol);
+      free(algorithms);
     }
     return;
   }
@@ -144,7 +152,7 @@
 
   int main(int argc, char **argv) {
     const char *dev = "lo";
-    pcap_t *handle;
+    pcap_t *handle = NULL;
     char error_buffer[PCAP_ERRBUF_SIZE];
     struct bpf_program filter;
     char filter_exp[] = "dst port 22 or dst port 2222";
