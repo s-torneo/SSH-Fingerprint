@@ -114,8 +114,8 @@
       MD5_CTX ctx;
       u_char fingerprint[16];
       MD5Init(&ctx);
-	    MD5Update(&ctx, (const unsigned char *)algorithms, strlen(algorithms));
-	    MD5Final(fingerprint, &ctx);
+      MD5Update(&ctx, (const unsigned char *)algorithms, strlen(algorithms));
+      MD5Final(fingerprint, &ctx);
       for(int i=0; i<16; i++)
 	      printf("%02x", fingerprint[i]);
       printf(" - %s\n",ssh_protocol);
