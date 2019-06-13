@@ -9,7 +9,7 @@ To compile it:
 To run it:
   
  - Using Makefile:
-     extracting ssh_pcap.tar.gz (you can use a sample ssh pcap), typing 'make test1' in the shell.
+     extract ssh_pcap.tar.gz (to get a sample ssh pcap), and then type 'make test1' in the shell.
   
   Or
 
