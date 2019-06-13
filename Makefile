@@ -28,4 +28,4 @@ clean		:
 test1 :
 	make clean
 	make
-	sudo ./filter ssh2.pcapng
+	sudo ./filter ssh_sample.pcapng
