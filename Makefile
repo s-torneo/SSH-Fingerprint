@@ -8,7 +8,7 @@
 
 CC		=  gcc
 CFLAGS	        += -std=c99 -Wall
-LIBS            = -lpcap -lcrypto
+LIBS            = -lpcap
 
 SOURCE = filter.c
 
@@ -16,7 +16,7 @@ OBJECTS		= filter.o
 
 TARGETS = filter
 
-.PHONY: clean test1 test2
+.PHONY: clean test1
 
 $(TARGETS): $(SOURCE)
 	$(CC) $(SOURCE) -o $(TARGETS) $(LIBS)
@@ -26,11 +26,6 @@ clean		:
 	rm -f $(OBJECTS)
 
 test1 :
-	make clean
-	make
-	sudo ./filter ssh.pcapng
-
-test2 :
 	make clean
 	make
 	sudo ./filter ssh2.pcapng
