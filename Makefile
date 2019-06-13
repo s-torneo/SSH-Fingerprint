@@ -12,7 +12,7 @@ LIBS            = -lpcap
 
 SOURCE = filter.c
 
-OBJECTS		= filter.o
+OBJECTS	= filter.o
 
 TARGETS = filter
 
@@ -21,7 +21,7 @@ TARGETS = filter
 $(TARGETS): $(SOURCE)
 	$(CC) $(SOURCE) -o $(TARGETS) $(LIBS)
 
-clean		: 
+clean : 
 	rm -f $(TARGETS)
 	rm -f $(OBJECTS)
 
