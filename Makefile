@@ -2,7 +2,7 @@
 # SSH-Fingerprint Progetto del corso di Gestione Rete 2018/2019 
 # 
 # Dipartimento di Informatica Università di Pisa
-# Docenti: Luca Deri
+# Docente: Luca Deri
 #
 #
 
