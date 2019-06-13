@@ -1,9 +1,17 @@
 # SSH-Fingerprint
 
-To run it:
+To compile it:
 
 - Download all files
-- Run Makefile, typing 'make' in the shell
-- Type './filter' specifying a device or a file .pcap*
+- Run Makefile using 'make' 
 
-Extracting ssh_pcap.tar.gz you can use a sample ssh pcap, typing 'make test1' in the shell.
+
+To run it:
+  
+ - Using Makefile:
+     extracting ssh_pcap.tar.gz (you can use a sample ssh pcap), typing 'make test1' in the shell.
+Or
+
+- Type 'sudo ./filter' specifying a device or a file .pcap*
+
+
