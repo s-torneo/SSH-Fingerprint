@@ -5,8 +5,7 @@
   #include <netinet/in.h>
   #include <netinet/if_ether.h>
 
-  #include <openssl/md5.h>
-
+  #include "md5_nDPI.h"
 
   /* Pointers to headers */
   const u_char *ip_header;
@@ -21,14 +20,6 @@
   int total_headers_size;
 
   char *ssh_protocol;
-
-  /* calcola la fingerprint */
-  void md5(char *algorithms, char *fingerprint){
-    unsigned char result [MD5_DIGEST_LENGTH];
-    MD5((unsigned char*)algorithms, strlen(algorithms), result);
-    for(int i = 0; i < 16; i++)
-      sprintf(&fingerprint[i*2], "%02x", (unsigned int)result[i]);
-  }
 
   /* prende gli algoritmi di hash dal payload separandoli con ';' */
   void Split(char *str, int *sum){
@@ -63,14 +54,6 @@
       i++;
     }
   }
-
-  /*void PrintInfo(const struct pcap_pkthdr *header){
-    printf("\nTotal packet available: %d bytes\n", header->caplen);
-    printf("Expected packet size: %d bytes\n", header->len);
-    printf("IP header length in bytes: %d\n", ip_header_length);
-    printf("Total size of headers: %d bytes\n", total_headers_size);
-    printf("Payload len: %d bytes\n", payload_length);
-  }*/
 
   void GetSSHProtocol(char *ssh_protocol){
     const u_char *temp_pointer = payload;
@@ -116,17 +99,11 @@
 
     payload = packet + total_headers_size;
 
-    /* uint32_t len = (uint32_t)*(payload + 4);
-    long len1 = ntohl(len); 
-    printf("\n\n len: %d",len); */
-
     if (payload_length > 7 && payload_length < 100 && memcmp(payload,"SSH-",4) == 0) {
-      //PrintInfo(header);
       ssh_protocol = calloc(payload_length,sizeof(char));
       GetSSHProtocol(ssh_protocol);
     }
     else if(payload_length > 1000 && payload_length < 1500){
-      //PrintInfo(header);
       char *split = calloc(payload_length,sizeof(char));
       int split_counter = 0;
       Split(split, &split_counter);
@@ -134,10 +111,14 @@
       Concat_Algorithms(algorithms, split, split_counter);
       free(split);
       printf("%s\n\n",algorithms);
-      char *fingerprint = calloc(33,sizeof(char));
-      md5(algorithms, fingerprint);
-      printf("%s - %s\n",fingerprint, ssh_protocol);
-      free(fingerprint);
+      MD5_CTX ctx;
+      u_char fingerprint[16];
+      MD5Init(&ctx);
+	    MD5Update(&ctx, (const unsigned char *)algorithms, strlen(algorithms));
+	    MD5Final(fingerprint, &ctx);
+      for(int i=0; i<16; i++)
+	      printf("%02x", fingerprint[i]);
+      printf(" - %s\n",ssh_protocol);
       free(ssh_protocol);
       free(algorithms);
     }
