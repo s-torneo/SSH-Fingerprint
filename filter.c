@@ -72,9 +72,12 @@
   void Concat_Algorithms(char *algorithms, char *str, int split_counter){
     int i = 0, flag = 0, counter_alg = 0;
     while(i < split_counter){
+      int tmp = i;
       while(str[i] == ';')
         i++;
-      if(str[i-1] == ';'){
+      if(abs(i-tmp)>1)
+        i = split_counter;
+      else if(str[i-1] == ';'){
         flag++;
         if(i < split_counter-1 && !(flag%2)){
           algorithms[counter_alg++] = str[i-1];
@@ -163,7 +166,7 @@
     char sourceIP[INET_ADDRSTRLEN], destIP[INET_ADDRSTRLEN];
     int sourcePort, destPort;
     IP_TCP_info(sourceIP, destIP, &sourcePort, &destPort);
-
+    //Payload();
     if (payload_length > 7 && payload_length < 100 && memcmp(payload,"SSH-",4) == 0) {
       if(destPort == 22 || destPort == 2222){
         GetSSHProtocol(ssh[ncount].ssh_protocol_client);
@@ -181,7 +184,7 @@
       }
       count_packet++;
     }
-    else if(payload_length > 1000 && payload_length < 1500){
+    else if(payload_length > 500 && payload_length < 1500){
       char *split = calloc(payload_length,sizeof(char));
       int split_counter = 0;
       Split(split, &split_counter);
