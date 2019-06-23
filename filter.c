@@ -10,6 +10,12 @@
 
   #include "md5_nDPI.h"
 
+  /* the get_uXX will return raw network packet bytes !! */
+  #define get_u_int8_t(X,O)  (*(u_int8_t *)(((u_int8_t *)X) + O))
+  #define get_u_int16_t(X,O)  (*(u_int16_t *)(((u_int8_t *)X) + O))
+  #define get_u_int32_t(X,O)  (*(u_int32_t *)(((u_int8_t *)X) + O))
+  #define get_u_int64_t(X,O)  (*(u_int64_t *)(((u_int8_t *)X) + O))
+
   typedef struct _SSH{
     char ssh_protocol_client[100];
     char algorithms_client[1500];
@@ -28,7 +34,7 @@
   }SSH;
 
   // array di struttura SSH
-  SSH *ssh;
+  SSH ssh[255];
 
   // contatore per l'array SSH
   int ncount = 0;
@@ -107,20 +113,41 @@
   }
 
   void PrintInfo(){
-    printf("[-] Client SSH_MSG_KEXINT detected ");
-    printf("[%s:%d -> %s:%d]\n",ssh[ncount].ip_source_client,ssh[ncount].port_source_client,ssh[ncount].ip_dest_client,ssh[ncount].port_dest_client);
-    printf("[-] SSH Protocol: %s",ssh[ncount].ssh_protocol_client);
-    printf("[-] hassh: ");
-    for(int i=0; i<16; i++)
-      printf("%02x", ssh[ncount].fingerprint_client[i]);
-    printf("\n[-] hassh Algorithms: %s\n",ssh[ncount].algorithms_client);
-    printf("\n[-] Server SSH_MSG_KEXINT detected ");
-    printf("[%s:%d -> %s:%d]\n",ssh[ncount].ip_source_server,ssh[ncount].port_source_server,ssh[ncount].ip_dest_server,ssh[ncount].port_dest_server);
-    printf("[-] SSH Protocol: %s",ssh[ncount].ssh_protocol_server);
-    printf("[-] hassh: ");
-    for(int i=0; i<16; i++)
-      printf("%02x", ssh[ncount].fingerprint_server[i]);
-    printf("\n[-] hassh Algorithms: %s\n\n",ssh[ncount].algorithms_server);
+    for(int i=0;i<ncount;i++){
+      printf("[-] Client SSH_MSG_KEXINT detected ");
+      printf("[%s:%d -> %s:%d]\n",ssh[i].ip_source_client,ssh[i].port_source_client,ssh[i].ip_dest_client,ssh[i].port_dest_client);
+      printf("[-] SSH Protocol: %s",ssh[i].ssh_protocol_client);
+      printf("[-] hassh: ");
+      for(int j=0; j<16; j++)
+        printf("%02x", ssh[i].fingerprint_client[j]);
+      printf("\n[-] hassh Algorithms: %s\n",ssh[i].algorithms_client);
+      printf("\n[-] Server SSH_MSG_KEXINT detected ");
+      printf("[%s:%d -> %s:%d]\n",ssh[i].ip_source_server,ssh[i].port_source_server,ssh[i].ip_dest_server,ssh[i].port_dest_server);
+      printf("[-] SSH Protocol: %s",ssh[i].ssh_protocol_server);
+      printf("[-] hassh: ");
+      for(int j=0; j<16; j++)
+        printf("%02x", ssh[i].fingerprint_server[j]);
+      printf("\n[-] hassh Algorithms: %s\n\n",ssh[i].algorithms_server);
+      for(int i=0;i<80;i++)
+        printf("-");
+      printf("\n\n");
+    }
+  }
+
+  int GetPos(char *sourceIP, char *destIP, int sourcePort, int destPort){
+    for(int i = 0; i < ncount; i++) {
+      /*if(!strcmp(sourceIP,ssh[i].ip_source_client) && !strcmp(destIP,ssh[i].ip_dest_client) && sourcePort==ssh[i].port_source_client && destPort==ssh[i].port_dest_client)
+        return i;
+      else if(!strcmp(sourceIP,ssh[i].ip_source_server) && !strcmp(destIP,ssh[i].ip_dest_server) && sourcePort==ssh[i].port_source_server && destPort==ssh[i].port_dest_server)
+        return i;*/
+      if(!strcmp(destIP,ssh[i].ip_source_client) && !strcmp(sourceIP,ssh[i].ip_dest_client) && destPort==ssh[i].port_source_client && sourcePort==ssh[i].port_dest_client)
+        return i;
+      else if(!strcmp(destIP,ssh[i].ip_source_server) && !strcmp(sourceIP,ssh[i].ip_dest_server) && destPort==ssh[i].port_source_server && sourcePort==ssh[i].port_dest_server)
+        return i;
+    }
+    int tmp = ncount;
+    ncount++;
+    return tmp;
   }
 
   void my_packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
@@ -166,52 +193,69 @@
     char sourceIP[INET_ADDRSTRLEN], destIP[INET_ADDRSTRLEN];
     int sourcePort, destPort;
     IP_TCP_info(sourceIP, destIP, &sourcePort, &destPort);
-    //Payload();
+
     if (payload_length > 7 && payload_length < 100 && memcmp(payload,"SSH-",4) == 0) {
       if(destPort == 22 || destPort == 2222){
-        GetSSHProtocol(ssh[ncount].ssh_protocol_client);
-        strcpy(ssh[ncount].ip_source_client,sourceIP);
-        ssh[ncount].port_source_client = sourcePort;
-        strcpy(ssh[ncount].ip_dest_client,destIP);
-        ssh[ncount].port_dest_client = destPort;
+        int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
+        printf("\npos cp %d - %s[%d] - %s[%d]",pos, sourceIP, sourcePort, destIP, destPort);
+        //printf("\npayload[%d]: %d\n",pos,payload_length);
+        GetSSHProtocol(ssh[pos].ssh_protocol_client);
+        strcpy(ssh[pos].ip_source_client,sourceIP);
+        ssh[pos].port_source_client = sourcePort;
+        strcpy(ssh[pos].ip_dest_client,destIP);
+        ssh[pos].port_dest_client = destPort;
       }
       else {
-        GetSSHProtocol(ssh[ncount].ssh_protocol_server);
-        strcpy(ssh[ncount].ip_source_server,sourceIP);
-        ssh[ncount].port_source_server = sourcePort;
-        strcpy(ssh[ncount].ip_dest_server,destIP);
-        ssh[ncount].port_dest_server = destPort;
+        int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
+        printf("\npos sp %d - %s[%d] - %s[%d]",pos, sourceIP, sourcePort, destIP, destPort);
+        //printf("\npayload[%d]: %d\n",pos,payload_length);
+        GetSSHProtocol(ssh[pos].ssh_protocol_server);
+        strcpy(ssh[pos].ip_source_server,sourceIP);
+        ssh[pos].port_source_server = sourcePort;
+        strcpy(ssh[pos].ip_dest_server,destIP);
+        ssh[pos].port_dest_server = destPort;
       }
-      count_packet++;
+      //count_packet++;
     }
-    else if(payload_length > 500 && payload_length < 1500){
+    else if(payload_length > 500 && payload_length < 2000){
       char *split = calloc(payload_length,sizeof(char));
       int split_counter = 0;
       Split(split, &split_counter);
-      if(destPort == 22 || destPort == 2222){
-        Concat_Algorithms(ssh[ncount].algorithms_client, split, split_counter);
-        free(split);
-        MD5_CTX ctx;
-        MD5Init(&ctx);
-        MD5Update(&ctx, (const unsigned char *)ssh[ncount].algorithms_client, strlen(ssh[ncount].algorithms_client));
-        MD5Final(ssh[ncount].fingerprint_client, &ctx);
+      u_int8_t msgcode = *(payload + 5);
+      /* printf("\nlen: %u\n",len);
+      u_int8_t padding = *(payload + 4); */
+      if(msgcode == 20){
+        if(destPort == 22 || destPort == 2222){
+          int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
+          printf("\npos ca %d - %s[%d] - %s[%d]",pos, sourceIP, sourcePort, destIP, destPort);
+          //printf("\npayload[%d] %d \n",pos,payload_length);
+          Concat_Algorithms(ssh[pos].algorithms_client, split, split_counter);
+          free(split);
+          MD5_CTX ctx;
+          MD5Init(&ctx);
+          MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_client, strlen(ssh[pos].algorithms_client));
+          MD5Final(ssh[pos].fingerprint_client, &ctx);
+        }
+        else {
+          int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
+          printf("\npos sa %d - %s[%d] - %s[%d]",pos, sourceIP, sourcePort, destIP, destPort);
+          //printf("\npayload[%d]: %d\n",pos,payload_length);
+          Concat_Algorithms(ssh[pos].algorithms_server, split, split_counter);
+          free(split);
+          MD5_CTX ctx;
+          MD5Init(&ctx);
+          MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_server, strlen(ssh[pos].algorithms_server));
+          MD5Final(ssh[pos].fingerprint_server, &ctx);
+        }
+        //count_packet++;
       }
-      else {
-        Concat_Algorithms(ssh[ncount].algorithms_server, split, split_counter);
-        free(split);
-        MD5_CTX ctx;
-        MD5Init(&ctx);
-        MD5Update(&ctx, (const unsigned char *)ssh[ncount].algorithms_server, strlen(ssh[ncount].algorithms_server));
-        MD5Final(ssh[ncount].fingerprint_server, &ctx);
-      }
-      count_packet++;
     }
-    if(count_packet==4) {
+    /*if(count_packet==4) {
       PrintInfo(ssh);
       ncount++;
       ssh = realloc(ssh,sizeof(SSH)*(ncount+1));
       count_packet = 0;
-    }
+    }*/
     return;
   }
 
@@ -263,12 +307,12 @@
       return 2;
     }
 
-    ssh = calloc(1,sizeof(SSH));
+    //ssh = calloc(1,sizeof(SSH));
 
     pcap_loop(handle,-1, my_packet_handler,NULL);
     pcap_close(handle);
-  
-    free(ssh);
+    PrintInfo();
+    //free(ssh);
   
     return 0;
   }
