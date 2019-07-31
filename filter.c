@@ -10,22 +10,16 @@
 
   #include "md5_nDPI.h"
 
-  /* the get_uXX will return raw network packet bytes !! */
-  #define get_u_int8_t(X,O)  (*(u_int8_t *)(((u_int8_t *)X) + O))
-  #define get_u_int16_t(X,O)  (*(u_int16_t *)(((u_int8_t *)X) + O))
-  #define get_u_int32_t(X,O)  (*(u_int32_t *)(((u_int8_t *)X) + O))
-  #define get_u_int64_t(X,O)  (*(u_int64_t *)(((u_int8_t *)X) + O))
-
   typedef struct _SSH{
     char ssh_protocol_client[100];
-    char algorithms_client[1500];
+    char algorithms_client[2000];
     u_char fingerprint_client[16];
     char ip_source_client[INET_ADDRSTRLEN];
     char ip_dest_client[INET_ADDRSTRLEN];
     int port_source_client;
     int port_dest_client;
     char ssh_protocol_server[100];
-    char algorithms_server[1500];
+    char algorithms_server[2000];
     u_char fingerprint_server[16];
     char ip_source_server[INET_ADDRSTRLEN];
     char ip_dest_server[INET_ADDRSTRLEN];
@@ -193,12 +187,10 @@
     char sourceIP[INET_ADDRSTRLEN], destIP[INET_ADDRSTRLEN];
     int sourcePort, destPort;
     IP_TCP_info(sourceIP, destIP, &sourcePort, &destPort);
-
+    
     if (payload_length > 7 && payload_length < 100 && memcmp(payload,"SSH-",4) == 0) {
       if(destPort == 22 || destPort == 2222){
         int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-        //printf("\npos cp %d - %s[%d] - %s[%d]",pos, sourceIP, sourcePort, destIP, destPort);
-        //printf("\npayload[%d]: %d\n",pos,payload_length);
         GetSSHProtocol(ssh[pos].ssh_protocol_client);
         strcpy(ssh[pos].ip_source_client,sourceIP);
         ssh[pos].port_source_client = sourcePort;
@@ -207,8 +199,6 @@
       }
       else {
         int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-        //printf("\npos sp %d - %s[%d] - %s[%d]",pos, sourceIP, sourcePort, destIP, destPort);
-        //printf("\npayload[%d]: %d\n",pos,payload_length);
         GetSSHProtocol(ssh[pos].ssh_protocol_server);
         strcpy(ssh[pos].ip_source_server,sourceIP);
         ssh[pos].port_source_server = sourcePort;
@@ -216,18 +206,16 @@
         ssh[pos].port_dest_server = destPort;
       }
     }
-    else if(payload_length > 500 && payload_length < 2000){
-      char *split = calloc(payload_length,sizeof(char));
-      int split_counter = 0;
-      Split(split, &split_counter);
+    else if(payload_length > 300 && payload_length < 2000){
       u_int8_t msgcode = *(payload + 5);
-      /* printf("\nlen: %u\n",len);
-      u_int8_t padding = *(payload + 4); */
+      //printf("\nmsg: %u\n",msgcode);
+      /*u_int8_t padding = *(payload + 4); */
       if(msgcode == 20){
+        char *split = calloc(payload_length,sizeof(char));
+        int split_counter = 0;
+        Split(split, &split_counter);
         if(destPort == 22 || destPort == 2222){
           int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-          //printf("\npos ca %d - %s[%d] - %s[%d]",pos, sourceIP, sourcePort, destIP, destPort);
-          //printf("\npayload[%d] %d \n",pos,payload_length);
           Concat_Algorithms(ssh[pos].algorithms_client, split, split_counter);
           free(split);
           MD5_CTX ctx;
@@ -238,8 +226,6 @@
         }
         else {
           int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-          //printf("\npos sa %d - %s[%d] - %s[%d]",pos, sourceIP, sourcePort, destIP, destPort);
-          //printf("\npayload[%d]: %d\n",pos,payload_length);
           Concat_Algorithms(ssh[pos].algorithms_server, split, split_counter);
           free(split);
           MD5_CTX ctx;
