@@ -95,9 +95,9 @@
 
   void PrintInfo(){
     for(int i=0;i<HASHTOT;i++){
-        SSH *ptr=ssh[i]; 
-
-      if(ssh[i]!=NULL && ssh[i]->completed>1 ){
+      SSH *ptr=ssh[i]; 
+      while(ptr!=NULL){
+      if(ptr!=NULL && ptr->completed>1 ){
         printf("[-] Client SSH_MSG_KEXINT detected ");
         printf("[%s:%d -> %s:%d]\n",ptr->ip_source_client,ptr->port_source_client,ptr->ip_dest_client,ptr->port_dest_client);
         printf("[-] SSH Protocol: %s",ptr->ssh_protocol_client);
@@ -116,6 +116,8 @@
           printf("-");
         printf("\n\n");
       }
+      ptr=ptr->next;
+     }
     }
   }
 
