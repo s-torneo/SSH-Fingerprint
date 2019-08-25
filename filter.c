@@ -7,6 +7,8 @@
   #include <netinet/ip.h>
   #include <netinet/tcp.h>
   #include <arpa/inet.h>
+  #include <signal.h>
+
   
   #include "md5_nDPI.h"
   #include "hash.c"
@@ -27,6 +29,14 @@
   /* struct header */
   const struct ip* ipHeader;
   const struct tcphdr* tcpHeader;
+  pcap_t *handle = NULL;
+    
+
+ //Gestore segnali
+ void gestore_int(int sig){
+    pcap_breakloop(handle);
+ }
+
 
   /* prende gli algoritmi d i hash dal payload separandoli con ';' */
   void Split(char *str, int *sum){
@@ -111,6 +121,7 @@
 
   
   void my_packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
+   
     struct ether_header *eth_header;
     eth_header = (struct ether_header *) packet;
 
@@ -174,8 +185,6 @@
     }
     else if(payload_length > 300 && payload_length < 2000){
       u_int8_t msgcode = *(payload + 5);
-      //printf("\nmsg: %u\n",msgcode);
-      /*u_int8_t padding = *(payload + 4); */
       if(msgcode == 20){
         char *split = calloc(payload_length,sizeof(char));
         int split_counter = 0;
@@ -211,10 +220,27 @@
     exit(0);
   }
 
+
+  
+//Installazione signal handler
+  void Signal(){
+    struct sigaction s; 
+    memset(&s,0,sizeof(s));
+    s.sa_handler=gestore_int;
+    if(sigaction(SIGINT,&s,NULL)==-1)
+      perror("sigaction SIGINT"); 
+    if(sigaction(SIGQUIT,&s,NULL)==-1)
+      perror("sigaction SIGQUIT"); 
+    if(sigaction(SIGTERM,&s,NULL)==-1)
+      perror("sigaction SIGTERM");
+  }
+
+
+ 
   int main(int argc, char **argv) {
+    Signal();
     InitHash();
     const char *dev = "lo";
-    pcap_t *handle = NULL;
     char error_buffer[PCAP_ERRBUF_SIZE];
     struct bpf_program filter;
     char filter_exp[] = "port 22 or port 2222";
@@ -253,9 +279,6 @@
       printf("Error setting filter - %s\n", pcap_geterr(handle));
       return 2;
     }
-
-    //ssh = calloc(1,sizeof(SSH));
-
     pcap_loop(handle,-1, my_packet_handler,NULL);
     pcap_close(handle);
     PrintInfo();
