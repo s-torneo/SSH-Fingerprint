@@ -7,32 +7,10 @@
   #include <netinet/ip.h>
   #include <netinet/tcp.h>
   #include <arpa/inet.h>
-
+  
   #include "md5_nDPI.h"
+  #include "hash.c"
 
-  typedef struct _SSH{
-    char ssh_protocol_client[100];
-    char algorithms_client[2000];
-    u_char fingerprint_client[16];
-    char ip_source_client[INET_ADDRSTRLEN];
-    char ip_dest_client[INET_ADDRSTRLEN];
-    int port_source_client;
-    int port_dest_client;
-    char ssh_protocol_server[100];
-    char algorithms_server[2000];
-    u_char fingerprint_server[16];
-    char ip_source_server[INET_ADDRSTRLEN];
-    char ip_dest_server[INET_ADDRSTRLEN];
-    int port_source_server;
-    int port_dest_server;
-    int completed;
-  }SSH;
-
-  // array di struttura SSH
-  SSH ssh[255];
-
-  // contatore per l'array SSH
-  int ncount = 0;
 
   /* Pointers to headers */
   const u_char *ip_header;
@@ -50,7 +28,7 @@
   const struct ip* ipHeader;
   const struct tcphdr* tcpHeader;
 
-  /* prende gli algoritmi di hash dal payload separandoli con ';' */
+  /* prende gli algoritmi d i hash dal payload separandoli con ';' */
   void Split(char *str, int *sum){
     const u_char *temp_pointer = (payload + 26); /* 26 byte = 4 byte packet length + 1 byte padding length 
     + 1 byte msg code + 16 byte ssh cookie + 4 kex_algorithms_length */
@@ -96,32 +74,34 @@
       ssh_protocol[i] = temp_pointer[i];
       i++;
     }
-  }
+  } 
 
   void IP_TCP_info(char *sourceIP, char *destIP, int *sourcePort, int *destPort){
     inet_ntop(AF_INET, &(ipHeader->ip_src), sourceIP, INET_ADDRSTRLEN);
     inet_ntop(AF_INET, &(ipHeader->ip_dst), destIP, INET_ADDRSTRLEN);
     *(sourcePort) = ntohs(tcpHeader->source);
-    *(destPort) = ntohs(tcpHeader->dest);
+    *(destPort) = ntohs(tcpHeader->dest); 
   }
 
   void PrintInfo(){
-    for(int i=0;i<ncount;i++){
-      if(ssh[i].completed>1){
+    for(int i=0;i<HASHTOT;i++){
+        SSH *ptr=ssh[i]; 
+
+      if(ssh[i]!=NULL && ssh[i]->completed>1 ){
         printf("[-] Client SSH_MSG_KEXINT detected ");
-        printf("[%s:%d -> %s:%d]\n",ssh[i].ip_source_client,ssh[i].port_source_client,ssh[i].ip_dest_client,ssh[i].port_dest_client);
-        printf("[-] SSH Protocol: %s",ssh[i].ssh_protocol_client);
+        printf("[%s:%d -> %s:%d]\n",ptr->ip_source_client,ptr->port_source_client,ptr->ip_dest_client,ptr->port_dest_client);
+        printf("[-] SSH Protocol: %s",ptr->ssh_protocol_client);
         printf("[-] hassh: ");
         for(int j=0; j<16; j++)
-          printf("%02x", ssh[i].fingerprint_client[j]);
-        printf("\n[-] hassh Algorithms: %s\n",ssh[i].algorithms_client);
+          printf("%02x", ptr->fingerprint_client[j]);
+        printf("\n[-] hassh Algorithms: %s\n",ptr->algorithms_client);
         printf("\n[-] Server SSH_MSG_KEXINT detected ");
-        printf("[%s:%d -> %s:%d]\n",ssh[i].ip_source_server,ssh[i].port_source_server,ssh[i].ip_dest_server,ssh[i].port_dest_server);
-        printf("[-] SSH Protocol: %s",ssh[i].ssh_protocol_server);
-        printf("[-] hassh: ");
+        printf("[%s:%d -> %s:%d]\n",ptr->ip_source_server,ptr->port_source_server,ptr->ip_dest_server,ptr->port_dest_server);
+        printf("[-] SSH Protocol: %s",ptr->ssh_protocol_server);
+        printf("[-] hassh:  ");
         for(int j=0; j<16; j++)
-          printf("%02x", ssh[i].fingerprint_server[j]);
-        printf("\n[-] hassh Algorithms: %s\n\n",ssh[i].algorithms_server);
+          printf("%02x", ptr->fingerprint_server[j]);
+        printf("\n[-] hassh Algorithms: %s\n\n",ptr->algorithms_server);
         for(int i=0;i<80;i++)
           printf("-");
         printf("\n\n");
@@ -129,21 +109,7 @@
     }
   }
 
-  int GetPos(char *sourceIP, char *destIP, int sourcePort, int destPort){
-    for(int i = 0; i < ncount; i++) {
-      /*if(!strcmp(sourceIP,ssh[i].ip_source_client) && !strcmp(destIP,ssh[i].ip_dest_client) && sourcePort==ssh[i].port_source_client && destPort==ssh[i].port_dest_client)
-        return i;
-      else if(!strcmp(sourceIP,ssh[i].ip_source_server) && !strcmp(destIP,ssh[i].ip_dest_server) && sourcePort==ssh[i].port_source_server && destPort==ssh[i].port_dest_server)
-        return i;*/
-      if(!strcmp(destIP,ssh[i].ip_source_client) && !strcmp(sourceIP,ssh[i].ip_dest_client) && destPort==ssh[i].port_source_client && sourcePort==ssh[i].port_dest_client)
-        return i;
-      else if(!strcmp(destIP,ssh[i].ip_source_server) && !strcmp(sourceIP,ssh[i].ip_dest_server) && destPort==ssh[i].port_source_server && sourcePort==ssh[i].port_dest_server)
-        return i;
-    }
-    ncount++;
-    return ncount-1;
-  }
-
+  
   void my_packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
     struct ether_header *eth_header;
     eth_header = (struct ether_header *) packet;
@@ -164,7 +130,7 @@
       return;
     }
 
-    /* pointer to struct header */
+    /* pointer to struct heade r */
     ipHeader = (struct ip*)(packet + sizeof(struct ether_header));
     tcpHeader = (struct tcphdr*)(packet + sizeof(struct ether_header) + sizeof(struct ip));
 
@@ -190,20 +156,20 @@
     
     if (payload_length > 7 && payload_length < 100 && memcmp(payload,"SSH-",4) == 0) {
       if(destPort == 22 || destPort == 2222){
-        int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-        GetSSHProtocol(ssh[pos].ssh_protocol_client);
-        strcpy(ssh[pos].ip_source_client,sourceIP);
-        ssh[pos].port_source_client = sourcePort;
-        strcpy(ssh[pos].ip_dest_client,destIP);
-        ssh[pos].port_dest_client = destPort;
+        SSH* ptr = FindPositionHash(sourceIP, destIP,sourcePort, destPort);
+        GetSSHProtocol(ptr->ssh_protocol_client);
+        strcpy(ptr->ip_source_client,sourceIP);
+        ptr->port_source_client = sourcePort; 
+        strcpy(ptr->ip_dest_client,destIP);
+        ptr->port_dest_client = destPort;
       }
       else {
-        int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-        GetSSHProtocol(ssh[pos].ssh_protocol_server);
-        strcpy(ssh[pos].ip_source_server,sourceIP);
-        ssh[pos].port_source_server = sourcePort;
-        strcpy(ssh[pos].ip_dest_server,destIP);
-        ssh[pos].port_dest_server = destPort;
+        SSH* ptr = FindPositionHash(sourceIP, destIP,sourcePort, destPort);
+        GetSSHProtocol(ptr->ssh_protocol_server);
+        strcpy(ptr->ip_source_server,sourceIP);
+        ptr->port_source_server = sourcePort;
+        strcpy(ptr->ip_dest_server,destIP); 
+        ptr->port_dest_server = destPort;
       }
     }
     else if(payload_length > 300 && payload_length < 2000){
@@ -215,24 +181,24 @@
         int split_counter = 0;
         Split(split, &split_counter);
         if(destPort == 22 || destPort == 2222){
-          int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-          Concat_Algorithms(ssh[pos].algorithms_client, split, split_counter);
+          SSH* ptr =  FindPositionHash(sourceIP, destIP,sourcePort, destPort);
+          Concat_Algorithms(ptr->algorithms_client, split, split_counter);
           free(split);
           MD5_CTX ctx;
           MD5Init(&ctx);
-          MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_client, strlen(ssh[pos].algorithms_client));
-          MD5Final(ssh[pos].fingerprint_client, &ctx);
-          ssh[pos].completed++;
+          MD5Update(&ctx, (const unsigned char *)ptr->algorithms_client, strlen(ptr->algorithms_client));
+          MD5Final(ptr->fingerprint_client, &ctx);
+          ptr->completed++;
         }
         else {
-          int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-          Concat_Algorithms(ssh[pos].algorithms_server, split, split_counter);
+          SSH* ptr =  FindPositionHash(sourceIP, destIP,sourcePort, destPort);
+          Concat_Algorithms(ptr->algorithms_server, split, split_counter);
           free(split);
           MD5_CTX ctx;
           MD5Init(&ctx);
-          MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_server, strlen(ssh[pos].algorithms_server));
-          MD5Final(ssh[pos].fingerprint_server, &ctx);
-          ssh[pos].completed++;
+          MD5Update(&ctx, (const unsigned char *)ptr->algorithms_server, strlen(ptr->algorithms_server));
+          MD5Final(ptr->fingerprint_server, &ctx);
+          ptr->completed++;
         }
       }
     }
@@ -246,6 +212,7 @@
   }
 
   int main(int argc, char **argv) {
+    InitHash();
     const char *dev = "lo";
     pcap_t *handle = NULL;
     char error_buffer[PCAP_ERRBUF_SIZE];
@@ -292,7 +259,6 @@
     pcap_loop(handle,-1, my_packet_handler,NULL);
     pcap_close(handle);
     PrintInfo();
-    //free(ssh);
-  
+    DestroyHash();
     return 0;
   }
