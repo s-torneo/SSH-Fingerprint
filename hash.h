@@ -1,14 +1,14 @@
  
 typedef struct _nodo{
   struct _nodo *next;
-  char ssh_protocol_client[100];
-    char algorithms_client[2000];
+    char *ssh_protocol_client;
+    char *algorithms_client;
     u_char fingerprint_client[16];
     char ip_source_client[INET_ADDRSTRLEN];
     char ip_dest_client[INET_ADDRSTRLEN];
     int port_source_client;
     int port_dest_client;
-    char ssh_protocol_server[100];
+    char *ssh_protocol_server;
     char algorithms_server[2000];
     u_char fingerprint_server[16];
     char ip_source_server[INET_ADDRSTRLEN];

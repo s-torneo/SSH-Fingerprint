@@ -28,17 +28,16 @@ void InitHash(){
 
 //calcolo chiave hash . Fornita dal docente icl_hash.
 unsigned int hash_Info(void* key){
-    char *datum = (char *)key;
-    unsigned int hash_value, i;
-    if(!datum) return 0;
-    for (hash_value = 0; *datum; ++datum) {
-        hash_value = (hash_value << ONE_EIGHTH) + *datum;
-        if ((i = hash_value & HIGH_BITS) != 0)
-            hash_value = (hash_value ^ (i >> THREE_QUARTERS)) & ~HIGH_BITS;
-    }
-    return (hash_value)%HASHTOT;
+  char *datum = (char *)key;
+  unsigned int hash_value, i;
+  if(!datum) return 0;
+  for (hash_value = 0; *datum; ++datum) {
+    hash_value = (hash_value << ONE_EIGHTH) + *datum;
+    if ((i = hash_value & HIGH_BITS) != 0)
+    hash_value = (hash_value ^ (i >> THREE_QUARTERS)) & ~HIGH_BITS;
+  }
+  return (hash_value)%HASHTOT;
 }
-
 
 //Inserisce l'elemento nella tabella Hash 
 SSH* InsertHash(char *sourceIP, char *destIP, int sourcePort, int destPort){
@@ -50,7 +49,6 @@ SSH* InsertHash(char *sourceIP, char *destIP, int sourcePort, int destPort){
   char s1[255];
   sprintf(s1,"%d",destPort);
   int i4=hash_Info(s1);//calcolo l'hash
- 
   int i=(i1+i2+i3+i4)%HASHTOT;
   if(ssh[i]==NULL){//Nel caso non ci sono collisioni: inserisco creo un nuovo utente x
     SSH *new;
@@ -59,26 +57,23 @@ SSH* InsertHash(char *sourceIP, char *destIP, int sourcePort, int destPort){
     new->next=NULL;
     ssh[i]=new;
     return ssh[i];
-  }//se ho collisioni, devo controllare che l'utente non sia già stato inserito
-    SSH *ptr=ssh[i];
-    int trovato=0;
-    while(ptr!=NULL){
-     if(!strcmp(destIP,ptr->ip_source_client) && !strcmp(sourceIP,ptr->ip_dest_client) && destPort==ptr->port_source_client && sourcePort==ptr->port_dest_client)
-        return ptr;
-      else if(!strcmp(destIP,ptr->ip_source_server) && !strcmp(sourceIP,ptr->ip_dest_server) && destPort==ptr->port_source_server && sourcePort==ptr->port_dest_server)
-        return ptr;
-      ptr=ptr->next;
-    }
-      SSH *new;
-      CHECK_PTR_HASH(new=(SSH *)malloc(sizeof(SSH)),Hash.Inserisci.trovato);
-      new->next=ssh[i];
-      new->completed=0;
-      ssh[i]=new;
-      return ssh[i];
-  
-  return NULL;
+  }
+  //se ho collisioni, devo controllare che l'utente non sia già stato inserito
+  SSH *ptr=ssh[i];
+  while(ptr!=NULL){
+    if(!strcmp(destIP,ptr->ip_source_client) && !strcmp(sourceIP,ptr->ip_dest_client) && destPort==ptr->port_source_client && sourcePort==ptr->port_dest_client)
+      return ptr;
+    else if(!strcmp(destIP,ptr->ip_source_server) && !strcmp(sourceIP,ptr->ip_dest_server) && destPort==ptr->port_source_server && sourcePort==ptr->port_dest_server)
+      return ptr;
+    ptr=ptr->next;
+  }
+  SSH *new;
+  CHECK_PTR_HASH(new=(SSH *)malloc(sizeof(SSH)),Hash.Inserisci.trovato);
+  new->next=ssh[i];
+  new->completed=0;
+  ssh[i]=new;
+  return ssh[i];
 }
-
 
 //ricerca l'elemento nella tabella hash restituendo il suo puntatore 
 SSH*  FindPositionHash(char *sourceIP, char *destIP, int sourcePort, int destPort){
@@ -91,21 +86,19 @@ SSH*  FindPositionHash(char *sourceIP, char *destIP, int sourcePort, int destPor
   sprintf(s1,"%d",destPort);
   int i4=hash_Info(s1);//calcolo l'hash
   int i=(i1+i2+i3+i4)%HASHTOT;
-  SSH *ptr=ssh[i];int trovato=0;//Ricerco nella lista di trabocco se è presente il nick
+  SSH *ptr=ssh[i];
+  //Ricerco nella lista di trabocco se è presente il nick
   while(ptr!=NULL){
-     if(!strcmp(destIP,ptr->ip_source_client) && !strcmp(sourceIP,ptr->ip_dest_client) && destPort==ptr->port_source_client && sourcePort==ptr->port_dest_client)
-        return ptr;
-      else if(!strcmp(destIP,ptr->ip_source_server) && !strcmp(sourceIP,ptr->ip_dest_server) && destPort==ptr->port_source_server && sourcePort==ptr->port_dest_server)
-        return ptr;
-  ptr=ptr->next;
-  
-   }
+    if(!strcmp(destIP,ptr->ip_source_client) && !strcmp(sourceIP,ptr->ip_dest_client) && destPort==ptr->port_source_client && sourcePort==ptr->port_dest_client)
+      return ptr;
+    else if(!strcmp(destIP,ptr->ip_source_server) && !strcmp(sourceIP,ptr->ip_dest_server) && destPort==ptr->port_source_server && sourcePort==ptr->port_dest_server)
+      return ptr;
+    ptr=ptr->next;
+  }
   SSH *new_ptr=InsertHash(sourceIP, destIP,sourcePort, destPort);
- return new_ptr;
+  return new_ptr;
 }
 
-
- 
 //Dealloca l'intera tabella Hash al momento della terminazione del server 
 void DestroyHash(){
  SSH *prev=NULL;SSH *ptr=NULL;int i=0;SSH *old=ptr;

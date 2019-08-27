@@ -170,6 +170,7 @@
     if (payload_length > 7 && payload_length < 100 && memcmp(payload,"SSH-",4) == 0) {
       if(destPort == 22 || destPort == 2222){
         SSH* ptr = FindPositionHash(sourceIP, destIP,sourcePort, destPort);
+        ptr->ssh_protocol_client = calloc(payload_length,sizeof(char));
         GetSSHProtocol(ptr->ssh_protocol_client);
         strcpy(ptr->ip_source_client,sourceIP);
         ptr->port_source_client = sourcePort; 
@@ -178,6 +179,7 @@
       }
       else {
         SSH* ptr = FindPositionHash(sourceIP, destIP,sourcePort, destPort);
+        ptr->ssh_protocol_server = calloc(payload_length,sizeof(char));
         GetSSHProtocol(ptr->ssh_protocol_server);
         strcpy(ptr->ip_source_server,sourceIP);
         ptr->port_source_server = sourcePort;
@@ -193,6 +195,7 @@
         Split(split, &split_counter);
         if(destPort == 22 || destPort == 2222){
           SSH* ptr =  FindPositionHash(sourceIP, destIP,sourcePort, destPort);
+          ptr->algorithms_client = calloc(split_counter,sizeof(char));
           Concat_Algorithms(ptr->algorithms_client, split, split_counter);
           free(split);
           MD5_CTX ctx;
@@ -203,6 +206,7 @@
         }
         else {
           SSH* ptr =  FindPositionHash(sourceIP, destIP,sourcePort, destPort);
+          //ptr->algorithms_server = calloc(split_counter,sizeof(char));
           Concat_Algorithms(ptr->algorithms_server, split, split_counter);
           free(split);
           MD5_CTX ctx;
@@ -265,7 +269,6 @@
         ip = 0;
         subnet_mask = 0;
       }
-
       handle = pcap_open_live(dev, BUFSIZ, 1, 1000, error_buffer);
       if (handle == NULL) {
         printf("Could not open %s - %s\n", dev, error_buffer);
