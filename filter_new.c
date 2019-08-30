@@ -7,6 +7,7 @@
   #include <netinet/ip.h>
   #include <netinet/tcp.h>
   #include <arpa/inet.h>
+  #include <signal.h>
 
   #include "md5_nDPI.h"
 
@@ -32,9 +33,15 @@
 
   // array di struttura SSH
   SSH ssh[255];
-
+pcap_t *handle = NULL;
   // contatore per l'array SSH
   int ncount = 0;
+
+ //Gestore segnali
+ void gestore_int(int sig){
+    pcap_breakloop(handle);
+ }
+
 
   /* Pointers to headers */
   const u_char *ip_header;
@@ -147,6 +154,7 @@
   
   void Algorithms(char *str){
     int l1 = GetLength(22);
+    if(l1<-1)return ;
     strcpy(str,GetAlgo(26,26+l1));
     int l2 = GetLength(26 + l1);
     int l3 = GetLength(26 + l1 + l2 + 4);
@@ -230,10 +238,6 @@
         if(destPort == 22 || destPort == 2222){
           int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
           Algorithms(ssh[pos].algorithms_client);
-          /*ssh[pos].algorithms_length_client[0] = l1;
-          ssh[pos].algorithms_length_client[1] = l3;
-          ssh[pos].algorithms_length_client[2] = l5;
-          ssh[pos].algorithms_length_client[3] = l7;*/
           MD5_CTX ctx;
           MD5Init(&ctx);
           MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_client, strlen(ssh[pos].algorithms_client));
@@ -249,7 +253,7 @@
           MD5Final(ssh[pos].fingerprint_server, &ctx);
           ssh[pos].completed++;
         }
-      }
+      } 
     }
     return;
   }
@@ -260,9 +264,26 @@
     exit(0);
   }
 
+
+    
+//Installazione signal handler
+  void Signal(){
+    struct sigaction s; 
+    memset(&s,0,sizeof(s));
+    s.sa_handler=gestore_int;
+    if(sigaction(SIGINT,&s,NULL)==-1)
+      perror("sigaction SIGINT"); 
+    if(sigaction(SIGQUIT,&s,NULL)==-1)
+      perror("sigaction SIGQUIT"); 
+    if(sigaction(SIGTERM,&s,NULL)==-1)
+      perror("sigaction SIGTERM");
+  }
+
+
   int main(int argc, char **argv) {
+    Signal();
     const char *dev = "lo";
-    pcap_t *handle = NULL;
+    handle = NULL;
     char error_buffer[PCAP_ERRBUF_SIZE];
     struct bpf_program filter;
     char filter_exp[] = "port 22 or port 2222";

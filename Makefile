@@ -10,11 +10,11 @@ CC		=  gcc
 CFLAGS	        += -std=c99 -Wall
 LIBS            = -lpcap
 
-SOURCE = filter.c
+SOURCE = filter_new.c
 
-OBJECTS	= filter.o
+OBJECTS	= filter_new.o
 
-TARGETS = filter
+TARGETS = filter_new
 
 .PHONY: clean test1
 
