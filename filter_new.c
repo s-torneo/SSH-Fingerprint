@@ -52,45 +52,6 @@
   const struct ip* ipHeader;
   const struct tcphdr* tcpHeader;
 
-  /* prende gli algoritmi di hash dal payload separandoli con ';' */
-  void Split(char *str, int *sum){
-    const u_char *temp_pointer = (payload + 26); /* 26 byte = 4 byte packet length + 1 byte padding length 
-    + 1 byte msg code + 16 byte ssh cookie + 4 kex_algorithms_length */
-    for (int i = 0; i < payload_length; i++) {
-      if ((temp_pointer[i] >= 32 && temp_pointer[i] <= 126) || temp_pointer[i] == 10 || temp_pointer[i] == 11 || temp_pointer[i] == 13){
-        str[*sum]=temp_pointer[i];
-        *(sum)+=1;
-      }
-      else {
-        str[*sum]=';';
-        *(sum)+=1;
-        i+=3; // numero dei byte per andare all'algoritmo di hash successivo
-      }
-    }
-  }
-  
-  /* concatena gli algoritmi di hash interessati */
-  void Concat_Algorithms(char *algorithms, char *str, int split_counter){
-    int i = 0, flag = 0, counter_alg = 0;
-    while(i < split_counter){
-      int tmp = i;
-      while(str[i] == ';')
-        i++;
-      if(abs(i-tmp)>1)
-        i = split_counter;
-      else if(str[i-1] == ';'){
-        flag++;
-        if(i < split_counter-1 && !(flag%2)){
-          algorithms[counter_alg++] = str[i-1];
-        }
-      }
-      if(!(flag % 2)){
-        algorithms[counter_alg++] = str[i];
-      }
-      i++;
-    }
-  }
-
   void GetSSHProtocol(char *ssh_protocol){
     const u_char *temp_pointer = payload;
     int i = 0;
@@ -100,10 +61,11 @@
     }
   }
 
-  u_char* GetAlgo(u_char* algo, int start, int end){
+  u_char* GetAlgo(int start, int end){
     const u_char *temp_pointer = payload;
     temp_pointer += start;
     int i = 0;
+    u_char *algo = calloc(end,sizeof(char));
     while(i < end){
       algo[i] = temp_pointer[i];
       i++;
@@ -182,6 +144,24 @@
     int number = (int)strtol(temp,NULL,16);
     return number;
   }
+  
+  void Algorithms(char *str){
+    int l1 = GetLength(22);
+    strcpy(str,GetAlgo(26,26+l1));
+    int l2 = GetLength(26 + l1);
+    int l3 = GetLength(26 + l1 + l2 + 4);
+    strcat(str,";");
+    strcat(str,GetAlgo(26+l1 + 4 + l2 + 4,26+l1+ 4 + l2 + 4 + l3));
+    int l4 = GetLength(26 + l1 + 4 + l2 +4 + l3);
+    int l5 = GetLength(26 + l1+4+l2+4+l3+4+l4);
+    strcat(str,";");
+    strcat(str,GetAlgo(26+l1+4+l2+4+l3+4+l4+4,26+l1+4+l2+4+l3+4+l4+4+l5));
+    int l6 = GetLength(26 + l1+4+l2+4+l3+4+l4+4+l5);
+    int l7 = GetLength(26 + l1+4+l2+4+l3+4+l4+4+l5+4+l6);
+    strcat(str,";");
+    strcat(str,GetAlgo(26+l1+4+l2+4+l3+4+l4+4+l5+4+l6+4,26+l1+4+l2+4+l3+4+l4+4+l5+4+l6+4+l7));
+    int l8 = GetLength(26 + l1+4+l2+4+l3+4+l4+4+l5+4+l6+4+l7);
+  }
 
   void my_packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
     struct ether_header *eth_header;
@@ -246,37 +226,14 @@
     }
     else if(payload_length > 300 && payload_length < 2000){
       u_int8_t msgcode = *(payload + 5);
-      //printf("\nmsg: %u\n",msgcode);
-      /*u_int8_t padding = *(payload + 4);*/
       if(msgcode == 20){
-        /* char *split = calloc(payload_length,sizeof(char));
-        int split_counter = 0;
-        Split(split, &split_counter); */
         if(destPort == 22 || destPort == 2222){
-          u_char algo[500];
           int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-          int l1 = GetLength(22);
-          strcpy(ssh[pos].algorithms_client,GetAlgo(algo,26,26+l1));
-          int l2 = GetLength(26 + l1);
-          int l3 = GetLength(26 + l1 + l2 + 4);
-          strcat(ssh[pos].algorithms_client,";");
-          strcat(ssh[pos].algorithms_client,GetAlgo(algo,26+l1 + l2 + 8,26+l1+l2+l3 + 8));
-          printf("\nl2: %d l3: %d\n",l2,l3);
-          /* int l4 = GetLength(26 + l3);
-          int l5 = GetLength(26 + l4);
-          //strcat(ssh[pos].algorithms_client,";");
-          //strcat(ssh[pos].algorithms_client,GetAlgo(algo,26+l1+l2+l3+l4,26+l1+l2+l3+l4+l5));
-          int l6 = GetLength(26 + l5);
-          int l7 = GetLength(26 + l6);
-          //strcat(ssh[pos].algorithms_client,";");
-          //strcat(ssh[pos].algorithms_client,GetAlgo(algo,26+l1+l2+l3+l4+l5+l6,26+l1+l2+l3+l4+l5+l6+l7));
-          int l8 = GetLength(26 + l7);
-          ssh[pos].algorithms_length_client[0] = l1;
+          Algorithms(ssh[pos].algorithms_client);
+          /*ssh[pos].algorithms_length_client[0] = l1;
           ssh[pos].algorithms_length_client[1] = l3;
           ssh[pos].algorithms_length_client[2] = l5;
           ssh[pos].algorithms_length_client[3] = l7;*/
-          //Concat_Algorithms(ssh[pos].algorithms_client, split, split_counter);
-          //free(split);
           MD5_CTX ctx;
           MD5Init(&ctx);
           MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_client, strlen(ssh[pos].algorithms_client));
@@ -284,29 +241,8 @@
           ssh[pos].completed++;
         }
         else {
-          u_char algo[500];
           int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
-          int l1 = GetLength(22);
-          //strcpy(ssh[pos].algorithms_server,GetAlgo(algo, 26,26+l1));
-          /*int l2 = GetLength(26 + l1);
-          int l3 = GetLength(26 + l2);
-          //strcat(ssh[pos].algorithms_server,";");
-          //strcat(ssh[pos].algorithms_server,GetAlgo(algo, 26+l1+l2,26+l1+l2+l3));
-          int l4 = GetLength(26 + l3);
-          int l5 = GetLength(26 + l4);
-          //strcat(ssh[pos].algorithms_server,";");
-          //strcat(ssh[pos].algorithms_server,GetAlgo(algo, 26+l1+l2+l3+l4,26+l1+l2+l3+l4+l5));
-          int l6 = GetLength(26 + l5);
-          int l7 = GetLength(26 + l6);
-          //strcat(ssh[pos].algorithms_server,";");
-          //strcat(ssh[pos].algorithms_server,GetAlgo(algo, 26+l1+l2+l3+l4+l5+l6,26+l1+l2+l3+l4+l5+l6+l7));
-          int l8 = GetLength(26 + l7);
-          ssh[pos].algorithms_length_server[0] = l1;
-          ssh[pos].algorithms_length_server[1] = l3;
-          ssh[pos].algorithms_length_server[2] = l5;
-          ssh[pos].algorithms_length_server[3] = l7;*/
-          //Concat_Algorithms(ssh[pos].algorithms_server, split, split_counter);
-          //free(split);
+          Algorithms(ssh[pos].algorithms_server);
           MD5_CTX ctx;
           MD5Init(&ctx);
           MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_server, strlen(ssh[pos].algorithms_server));
