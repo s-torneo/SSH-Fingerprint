@@ -8,9 +8,11 @@
   #include <netinet/tcp.h>
   #include <arpa/inet.h>
   #include <signal.h>
-
   #include "md5_nDPI.h"
-
+  
+  #define MAX_DIM 10 //dimensione iniziale, si rialloca con la nuova dimensione(vedi GetPos)
+  
+  //struttura che riassume tutte le informazioni da stampare 
   typedef struct _SSH{
     char ssh_protocol_client[100];
     int algorithms_length_client[10];
@@ -28,22 +30,25 @@
     char ip_dest_server[INET_ADDRSTRLEN];
     int port_source_server;
     int port_dest_server;
-    int completed;
+    int completed;//flag che indica se sono arrivati tutti i pacchetti 
   }SSH;
 
   // array di struttura SSH
-  SSH ssh[255];
-pcap_t *handle = NULL;
+  SSH *ssh;
+ 
+  //descrittore di pcap
+  pcap_t *handle = NULL;
+  
   // contatore per l'array SSH
   int ncount = 0;
 
- //Gestore segnali
- void gestore_int(int sig){
-    pcap_breakloop(handle);
- }
+  //Gestore segnali
+  void gestore_int(int sig){
+    pcap_breakloop(handle); //funzione thread-safe, interrompe 
+  }
 
 
-  /* Pointers to headers */
+  /* Puntatori agli headers */
   const u_char *ip_header;
   const u_char *tcp_header;
   const u_char *payload;
@@ -59,6 +64,7 @@ pcap_t *handle = NULL;
   const struct ip* ipHeader;
   const struct tcphdr* tcpHeader;
 
+  //legge e salva il payload del pacchetto che contiene il protocollo ssh usato
   void GetSSHProtocol(char *ssh_protocol){
     const u_char *temp_pointer = payload;
     int i = 0;
@@ -67,7 +73,8 @@ pcap_t *handle = NULL;
       i++;
     }
   }
-
+  
+  //recupera dal payload la porzione degli algoritmi interessat compresi tra start e end 
   u_char* GetAlgo(int start, int end){
     const u_char *temp_pointer = payload;
     temp_pointer += start;
@@ -79,17 +86,19 @@ pcap_t *handle = NULL;
     }
     return algo;
   }
-
+  
+  //recupera e salva le le comunicazione per identificare la comunizazione
   void IP_TCP_info(char *sourceIP, char *destIP, int *sourcePort, int *destPort){
     inet_ntop(AF_INET, &(ipHeader->ip_src), sourceIP, INET_ADDRSTRLEN);
     inet_ntop(AF_INET, &(ipHeader->ip_dst), destIP, INET_ADDRSTRLEN);
     *(sourcePort) = ntohs(tcpHeader->source);
     *(destPort) = ntohs(tcpHeader->dest);
   }
-
+  
+  //stampa le fingerprint delle comunicazioni
   void PrintInfo(){
     for(int i=0;i<ncount;i++){
-      if(ssh[i].completed>1){
+      if(ssh[i].completed>=2){
         printf("[-] Client SSH_MSG_KEXINT detected ");
         printf("[%s:%d -> %s:%d]\n",ssh[i].ip_source_client,ssh[i].port_source_client,ssh[i].ip_dest_client,ssh[i].port_dest_client);
         printf("[-] SSH Protocol: %s",ssh[i].ssh_protocol_client);
@@ -110,22 +119,21 @@ pcap_t *handle = NULL;
       }
     }
   }
-
+  
+  //recupera l'indice della comunicazione in corso da completare altrimenti ne apre una nuova
   int GetPos(char *sourceIP, char *destIP, int sourcePort, int destPort){
     for(int i = 0; i < ncount; i++) {
-      /*if(!strcmp(sourceIP,ssh[i].ip_source_client) && !strcmp(destIP,ssh[i].ip_dest_client) && sourcePort==ssh[i].port_source_client && destPort==ssh[i].port_dest_client)
-        return i;
-      else if(!strcmp(sourceIP,ssh[i].ip_source_server) && !strcmp(destIP,ssh[i].ip_dest_server) && sourcePort==ssh[i].port_source_server && destPort==ssh[i].port_dest_server)
-        return i;*/
       if(!strcmp(destIP,ssh[i].ip_source_client) && !strcmp(sourceIP,ssh[i].ip_dest_client) && destPort==ssh[i].port_source_client && sourcePort==ssh[i].port_dest_client)
         return i;
       else if(!strcmp(destIP,ssh[i].ip_source_server) && !strcmp(sourceIP,ssh[i].ip_dest_server) && destPort==ssh[i].port_source_server && sourcePort==ssh[i].port_dest_server)
         return i;
     }
     ncount++;
+    if(ncount>=MAX_DIM)ssh=realloc(ssh,ncount*sizeof(SSH));
     return ncount-1;
   }
-
+  
+  //calcola le lunghezze degli algoritmi nel pacchetto
   int GetLength(int start){
     u_char pl1 = *(payload + 0 + start);
     u_char pl2 = *(payload + 1 + start);
@@ -148,29 +156,31 @@ pcap_t *handle = NULL;
         i+=3;
       }
     }
-    int number = (int)strtol(temp,NULL,16);
+    int number = (int)strtol(temp,NULL,16);//conversione da hex ascii in integer
     return number;
   }
   
+  //seleziona gli algoritmi da concatenare
   void Algorithms(char *str){
-    int l1 = GetLength(22);
+    int l1 = GetLength(22);//lunghezza del primo blocco di algoritmi
     if(l1<-1)return ;
     strcpy(str,GetAlgo(26,26+l1));
-    int l2 = GetLength(26 + l1);
-    int l3 = GetLength(26 + l1 + l2 + 4);
+    int l2 = GetLength(26 + l1);//lunghezza del secondo blocco di algoritmi
+    int l3 = GetLength(26 + l1 + l2 + 4);//lunghezza terzo blocco di algoritmi
     strcat(str,";");
     strcat(str,GetAlgo(26+l1 + 4 + l2 + 4,26+l1+ 4 + l2 + 4 + l3));
-    int l4 = GetLength(26 + l1 + 4 + l2 +4 + l3);
-    int l5 = GetLength(26 + l1+4+l2+4+l3+4+l4);
+    int l4 = GetLength(26 + l1 + 4 + l2 +4 + l3);//lunghezza quarto blocco di algoritmi
+    int l5 = GetLength(26 + l1+4+l2+4+l3+4+l4);//lunghezza quinto blocco di algoritmi
     strcat(str,";");
     strcat(str,GetAlgo(26+l1+4+l2+4+l3+4+l4+4,26+l1+4+l2+4+l3+4+l4+4+l5));
-    int l6 = GetLength(26 + l1+4+l2+4+l3+4+l4+4+l5);
-    int l7 = GetLength(26 + l1+4+l2+4+l3+4+l4+4+l5+4+l6);
+    int l6 = GetLength(26 + l1+4+l2+4+l3+4+l4+4+l5);//lunghezza sesto blocco di algortimi
+    int l7 = GetLength(26 + l1+4+l2+4+l3+4+l4+4+l5+4+l6);//lunghezza settimo blocco di algoritmi
     strcat(str,";");
     strcat(str,GetAlgo(26+l1+4+l2+4+l3+4+l4+4+l5+4+l6+4,26+l1+4+l2+4+l3+4+l4+4+l5+4+l6+4+l7));
     int l8 = GetLength(26 + l1+4+l2+4+l3+4+l4+4+l5+4+l6+4+l7);
   }
 
+  //gestore pacchetto
   void my_packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet){
     struct ether_header *eth_header;
     eth_header = (struct ether_header *) packet;
@@ -215,7 +225,7 @@ pcap_t *handle = NULL;
     IP_TCP_info(sourceIP, destIP, &sourcePort, &destPort);
     
     if (payload_length > 7 && payload_length < 100 && memcmp(payload,"SSH-",4) == 0) {
-      if(destPort == 22 || destPort == 2222){
+      if(destPort == 22 || destPort == 2222){//client to server 
         int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
         GetSSHProtocol(ssh[pos].ssh_protocol_client);
         strcpy(ssh[pos].ip_source_client,sourceIP);
@@ -223,7 +233,7 @@ pcap_t *handle = NULL;
         strcpy(ssh[pos].ip_dest_client,destIP);
         ssh[pos].port_dest_client = destPort;
       }
-      else {
+      else {//server to client
         int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
         GetSSHProtocol(ssh[pos].ssh_protocol_server);
         strcpy(ssh[pos].ip_source_server,sourceIP);
@@ -232,22 +242,22 @@ pcap_t *handle = NULL;
         ssh[pos].port_dest_server = destPort;
       }
     }
-    else if(payload_length > 300 && payload_length < 2000){
-      u_int8_t msgcode = *(payload + 5);
+    else if(payload_length > 300 && payload_length < 2000){//client to server
+      u_int8_t msgcode = *(payload + 5);//decodifica del message code per identificare il tipo di pacchetto
       if(msgcode == 20){
         if(destPort == 22 || destPort == 2222){
           int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
           Algorithms(ssh[pos].algorithms_client);
-          MD5_CTX ctx;
+          MD5_CTX ctx;//calcolo fingerprint
           MD5Init(&ctx);
           MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_client, strlen(ssh[pos].algorithms_client));
           MD5Final(ssh[pos].fingerprint_client, &ctx);
           ssh[pos].completed++;
         }
-        else {
+        else {//server to client
           int pos = GetPos(sourceIP, destIP, sourcePort, destPort);
           Algorithms(ssh[pos].algorithms_server);
-          MD5_CTX ctx;
+          MD5_CTX ctx;//calcolo fingerprint
           MD5Init(&ctx);
           MD5Update(&ctx, (const unsigned char *)ssh[pos].algorithms_server, strlen(ssh[pos].algorithms_server));
           MD5Final(ssh[pos].fingerprint_server, &ctx);
@@ -323,12 +333,10 @@ pcap_t *handle = NULL;
       return 2;
     }
 
-    //ssh = calloc(1,sizeof(SSH));
-
+    ssh = malloc(MAX_DIM*sizeof(SSH));
     pcap_loop(handle,-1, my_packet_handler,NULL);
     pcap_close(handle);
     PrintInfo();
-    //free(ssh);
-  
+    free(ssh);
     return 0;
   }
