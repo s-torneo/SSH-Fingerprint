@@ -10,11 +10,11 @@ CC		=  gcc
 CFLAGS	        += -std=c99 -Wall
 LIBS            = -lpcap
 
-SOURCE = filter_new.c
+SOURCE = FingerprintSSH.c
 
-OBJECTS	= filter_new.o
+OBJECTS	= FingerprintSSH.o
 
-TARGETS = filter_new
+TARGETS = FingerprintSSH
 
 .PHONY: clean test1
 
@@ -28,4 +28,4 @@ clean :
 test1 :
 	make clean
 	make
-	./filter ssh_sample.pcapng
+	./FingerprintSSH ssh_sample.pcapng
