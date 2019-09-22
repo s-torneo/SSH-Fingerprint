@@ -28,4 +28,4 @@ clean :
 test1 :
 	make clean
 	make
-	./FingerprintSSH ssh_sample.pcap
+	./FingerprintSSH sample_ssh.pcap
